@@ -116,36 +116,38 @@ const { GitHubQuery } = require("./github");
           });
           title = issue.title;
           issueFields = {
-            issue_state: issue.state,
-            issue_labels: issue.labels.length
+            // State: issue.state,
+            Labels: issue.labels.length
               ? issue.labels.reduce((labelString, label) => {
                   return labelString === null
                     ? label.name
                     : labelString + ", " + label.name;
                 }, null)
               : undefined,
-            issue_link: issue.html_url, // This is either the PR request (if exists) or issue
-            issue_body: issue.body,
-            issue_assignees: issue.assignees.length
+            // issue_link: issue.html_url, // This is either the PR request (if exists) or issue
+            // issue_body: issue.body,
+            Assignees: issue.assignees.length
               ? issue.assignees.reduce((assigneeString, assignee) => {
                   return assigneeString === null
                     ? assignee.login
                     : assigneeString + ", " + assignee.login;
                 }, null)
               : undefined,
+            /*
             issue_created_at: issue.created_at,
             issue_updated_at: issue.updated_at,
             issue_closed_at: issue.closed_at,
-            issue_milestone: issue.milestone ? issue.milestone.title : null,
+            */
+            Milestone: issue.milestone ? issue.milestone.title : null,
           };
         }
 
         const cardFields = {
-          title: title,
-          column: column.name,
-          creator: card.creator.login,
-          created_at: card.created_at,
-          updated_at: card.updated_at,
+          Title: title,
+          Column: column.name,
+          // creator: card.creator.login,
+          // created_at: card.created_at,
+          // updated_at: card.updated_at,
         };
 
         if (!addedCardHeaders) {
