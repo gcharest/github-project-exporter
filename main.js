@@ -136,6 +136,7 @@ const { GitHubQuery } = require("./github");
             issue_created_at: issue.created_at,
             issue_updated_at: issue.updated_at,
             issue_closed_at: issue.closed_at,
+            issue_milestone: issue.milestone ? issue.milestone.title : null,
           };
         }
 
