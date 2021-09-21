@@ -3,11 +3,12 @@ const axios = require("axios");
 const API_URL = "https://api.github.com";
 
 class GitHubQuery {
-  constructor({ owner, repo, token, isOwnerUser }) {
+  constructor({ owner, repo, token, isOwnerUser, per_page }) {
     this.owner = owner;
     this.repo = repo;
     this.token = token;
     this.isOwnerUser = isOwnerUser;
+    this.per_page = 60
   }
 
   get = async (url, { prependAPIURL = true } = {}) => {
@@ -34,7 +35,7 @@ class GitHubQuery {
   };
 
   getColumnCards = async (columnId) => {
-    return await this.get(`projects/columns/${columnId}/cards`);
+    return await this.get(`projects/columns/${columnId}/cards?per_page=${this.per_page}`);
   };
 }
 
