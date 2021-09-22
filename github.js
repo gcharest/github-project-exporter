@@ -8,7 +8,7 @@ class GitHubQuery {
     this.repo = repo;
     this.token = token;
     this.isOwnerUser = isOwnerUser;
-    this.per_page = 60
+    this.perPage = 100
   }
 
   get = async (url, { prependAPIURL = true } = {}) => {
@@ -35,7 +35,7 @@ class GitHubQuery {
   };
 
   getColumnCards = async (columnId) => {
-    return await this.get(`projects/columns/${columnId}/cards?per_page=${this.per_page}`);
+    return await this.get(`projects/columns/${columnId}/cards?per_page=${this.perPage}`);
   };
 }
 
