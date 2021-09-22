@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /* eslint-disable no-restricted-syntax */
 // const { default: axios } = require('axios');
 const prompt = require('prompt');
@@ -103,77 +104,86 @@ const { GitHubQuery } = require('./github');
       // eslint-disable-next-line no-await-in-loop
       const cards = await GitHub.getColumnCards(column.id);
       column.numCards = cards.length;
-      // eslint-disable-next-line no-restricted-syntax
-      // eslint-disable-next-line no-undef
-      for (const card of cards) {
-        // For a regular note card, `card.note` is the card contents.
-        // For an Issue card, `card.note` is null.
-        let title = card.note;
-
-        // If card is an issue, populate issue fields.
-        let issueFields = {};
-        if (card.content_url?.includes('issues')) {
+      if (Array.isArray(cards)) {
+        const issues = cards.map(async (card) => {
+          // For an Issue card, `card.note` is null.
+          if (card.content_url?.includes('issues')) {
           // const atleastOneIssue = true;
           // eslint-disable-next-line no-await-in-loop
-          const issue = await GitHub.get(card.content_url, {
-            prependAPIURL: false,
-          });
-          title = issue.title;
-          issueFields = {
-            // State: issue.state,
-            Labels: issue.labels.length
-              ? issue.labels.reduce((labelString, label) => (labelString === null
-                ? label.name
-                : `${labelString}, ${label.name}`), null)
-              : undefined,
-            // issue_link: issue.html_url, // This is either the PR request (if exists) or issue
-            // issue_body: issue.body,
-            Assignees: issue.assignees.length
-              ? issue.assignees.reduce((assigneeString, assignee) => (assigneeString === null
-                ? assignee.login
-                : `${assigneeString}, ${assignee.login}`), null)
-              : undefined,
-            Initiative: issue.labels.length
-              ? issue.labels.reduce((labelString, label) => {
-                if (labelString === null) {
-                  if (label.name.includes('initiative:')) {
-                    return label.name;
-                  }
-                  return null;
-                }
-                return labelString;
-              }, null)
-              : undefined,
-            /*
-            issue_created_at: issue.created_at,
-            issue_updated_at: issue.updated_at,
-            issue_closed_at: issue.closed_at,
-            */
-            Milestone: issue.milestone ? issue.milestone.title : null,
-          };
-        }
+            const issue = await GitHub.get(card.content_url, {
+              prependAPIURL: false,
+            });
+            return issue;
+          }
+          return card;
+        });
+        for (const issue of issues) {
+          // eslint-disable-next-line no-await-in-loop
+          const issueValue = await issue;
+          // For a regular note card, `card.note` is the card contents.
+          // For an Issue card, `card.note` is null.
+          const title = issueValue.note ? issueValue.note : issueValue.title;
 
-        const cardFields = {
-          Title: title,
-          Column: column.name,
+          // If card is an issue, populate issue fields.
+          let issueFields = {};
+          if (!issueValue.note) {
+            issueFields = {
+            // State: issueValue.state,
+              Labels: issueValue.labels.length
+                ? issueValue.labels.reduce((labelString, label) => (labelString === null
+                  ? label.name
+                  : `${labelString}, ${label.name}`), null)
+                : undefined,
+              // eslint-disable-next-line max-len
+              // issue_link: issueValue.html_url, // This is either the PR request (if exists) or issue
+              // issue_body: issueValue.body,
+              Assignees: issueValue.assignees.length
+                ? issueValue.assignees.reduce((assigneeString, assignee) => (assigneeString === null
+                  ? assignee.login
+                  : `${assigneeString}, ${assignee.login}`), null)
+                : undefined,
+              Initiative: issueValue.labels.length
+                ? issueValue.labels.reduce((labelString, label) => {
+                  if (labelString === null) {
+                    if (label.name.includes('initiative:')) {
+                      return label.name;
+                    }
+                    return null;
+                  }
+                  return labelString;
+                }, null)
+                : undefined,
+              /*
+            issue_created_at: issueValue.created_at,
+            issue_updated_at: issueValue.updated_at,
+            issue_closed_at: issueValue.closed_at,
+            */
+              Milestone: issueValue.milestone ? issueValue.milestone.title : null,
+            };
+          }
+
+          const cardFields = {
+            Title: title,
+            Column: column.name,
           // creator: card.creator.login,
           // created_at: card.created_at,
           // updated_at: card.updated_at,
-        };
+          };
 
-        if (!addedCardHeaders) {
-          addedCardHeaders = true;
-          csvHeaders = csvHeaders.concat(Object.keys(cardFields));
-        }
-        if (!addedIssueHeaders && Object.keys(issueFields).length) {
-          addedIssueHeaders = true;
-          csvHeaders = csvHeaders.concat(Object.keys(issueFields));
-        }
+          if (!addedCardHeaders) {
+            addedCardHeaders = true;
+            csvHeaders = csvHeaders.concat(Object.keys(cardFields));
+          }
+          if (!addedIssueHeaders && Object.keys(issueFields).length) {
+            addedIssueHeaders = true;
+            csvHeaders = csvHeaders.concat(Object.keys(issueFields));
+          }
 
-        exportData.push({
-          ...cardFields,
-          ...issueFields,
-        });
+          exportData.push({
+            ...cardFields,
+            ...issueFields,
+          });
+        }
       }
     }
 
