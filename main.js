@@ -14,7 +14,9 @@ const { GitHubQuery } = require('./github');
     console.log('-----------------------');
 
     prompt.start();
-    const { owner, repo, token } = await prompt.get([
+    const {
+      owner, repo, token, perPage,
+    } = await prompt.get([
       {
         name: 'owner',
         default: process.env.OWNER ?? undefined,
@@ -34,6 +36,13 @@ const { GitHubQuery } = require('./github');
         required: true,
         type: 'string',
       },
+      {
+        name: 'perPage',
+        default: process.env.PER_PAGE ?? 30,
+        description: 'Number of results per page (max 100)',
+        required: true,
+        type: 'number',
+      },
     ]);
 
     const isOwnerUser = repo.length === 0
@@ -52,7 +61,7 @@ const { GitHubQuery } = require('./github');
       : true;
 
     const GitHub = new GitHubQuery({
-      owner, repo, token, isOwnerUser,
+      owner, repo, token, isOwnerUser, perPage,
     });
 
     process.stdout.write('Getting projects...');
