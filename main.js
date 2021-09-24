@@ -1,12 +1,12 @@
 /* eslint-disable no-console */
 /* eslint-disable no-restricted-syntax */
-// const { default: axios } = require('axios');
-const prompt = require('prompt');
-const Papa = require('papaparse');
-const fs = require('fs-extra');
-require('dotenv').config();
+import prompt from 'prompt';
+import * as fs from 'fs-extra';
+import {} from 'dotenv/config';
+import Papa from 'papaparse';
 
-const { GitHubQuery } = require('./github');
+// eslint-disable-next-line import/extensions
+import GitHubQuery from './github.mjs';
 
 (async () => {
   try {
@@ -15,7 +15,7 @@ const { GitHubQuery } = require('./github');
 
     prompt.start();
     const {
-      owner, repo, token, perPage,
+      owner, repo, token, perPage, maxResults,
     } = await prompt.get([
       {
         name: 'owner',
@@ -41,6 +41,12 @@ const { GitHubQuery } = require('./github');
         default: process.env.PER_PAGE ?? 30,
         description: 'Number of results per page (max 100)',
         required: true,
+        type: 'number',
+      },
+      {
+        name: 'maxResults',
+        default: process.env.MAX_RESULTS ?? 100,
+        description: 'Maximum number of results per column (max 100)',
         type: 'number',
       },
     ]);
@@ -91,13 +97,12 @@ const { GitHubQuery } = require('./github');
       type: 'integer',
     });
 
-    process.stdout.write('Getting cards...');
+    process.stdout.write('Getting project columns...');
 
     const projectId = projects[projectIndex].id;
     const columns = await GitHub.getProjectColumns(projectId);
 
     const exportData = [];
-
     /**
      * We use PapaParse for parsing to CSV,
      * which uses the fields of the first object for the CSV headers,
@@ -108,27 +113,39 @@ const { GitHubQuery } = require('./github');
     let csvHeaders = [];
     let addedCardHeaders = false;
     let addedIssueHeaders = false;
-
+    process.stdout.write('\nGetting cards...');
+    // const column = columns[3];
     for (const column of columns) {
       // eslint-disable-next-line no-await-in-loop
-      const cards = await GitHub.getColumnCards(column.id);
+      let cards = await GitHub.getColumnCards(column.id);
+      // Too many concurrent results will trigger API secondary rate limit
+      if (cards.length > maxResults) {
+        cards = cards.slice(0, maxResults);
+      }
       column.numCards = cards.length;
       if (Array.isArray(cards)) {
+      // eslint-disable-next-line no-loop-func
         const issues = cards.map(async (card) => {
-          // For an Issue card, `card.note` is null.
+        // For an Issue card, `card.note` is null.
           if (card.content_url?.includes('issues')) {
-          // const atleastOneIssue = true;
-          // eslint-disable-next-line no-await-in-loop
-            const issue = await GitHub.get(card.content_url, {
-              prependAPIURL: false,
-            });
-            return issue;
+          // Get issue number from content_url
+            const issueId = card.content_url.match(/\d+/g);
+            // eslint-disable-next-line no-await-in-loop
+            try {
+              const issue = await GitHub.getIssue(+issueId);
+              return issue.data ? issue.data : issue;
+            } catch (err) {
+              console.log(`Get issue error with issue ID: ${issueId}`);
+              console.log(err);
+            }
           }
           return card;
         });
+        console.log(`\nColumn ${column.name} issues loaded `);
         for (const issue of issues) {
-          // eslint-disable-next-line no-await-in-loop
+        // eslint-disable-next-line no-await-in-loop
           const issueValue = await issue;
+
           // For a regular note card, `card.note` is the card contents.
           // For an Issue card, `card.note` is null.
           const title = issueValue.note ? issueValue.note : issueValue.title;
@@ -138,7 +155,7 @@ const { GitHubQuery } = require('./github');
           if (!issueValue.note) {
             issueFields = {
             // State: issueValue.state,
-              Labels: issueValue.labels.length
+              Labels: issueValue.labels.length > 0
                 ? issueValue.labels.reduce((labelString, label) => (labelString === null
                   ? label.name
                   : `${labelString}, ${label.name}`), null)
@@ -146,7 +163,7 @@ const { GitHubQuery } = require('./github');
               // eslint-disable-next-line max-len
               // issue_link: issueValue.html_url, // This is either the PR request (if exists) or issue
               // issue_body: issueValue.body,
-              Assignees: issueValue.assignees.length
+              Assignees: issueValue.assignees.length > 0
                 ? issueValue.assignees.reduce((assigneeString, assignee) => (assigneeString === null
                   ? assignee.login
                   : `${assigneeString}, ${assignee.login}`), null)
