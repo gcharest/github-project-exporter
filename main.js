@@ -15,7 +15,7 @@ import GitHubQuery from './github.mjs';
 
     prompt.start();
     const {
-      owner, repo, token, perPage, maxResults,
+      owner, repo, token, perPage,
     } = await prompt.get([
       {
         name: 'owner',
@@ -67,7 +67,11 @@ import GitHubQuery from './github.mjs';
       : true;
 
     const GitHub = new GitHubQuery({
-      owner, repo, token, isOwnerUser, perPage,
+      owner,
+      repo,
+      token,
+      isOwnerUser,
+      perPage,
     });
 
     process.stdout.write('Getting projects...');
@@ -113,63 +117,86 @@ import GitHubQuery from './github.mjs';
     let csvHeaders = [];
     let addedCardHeaders = false;
     let addedIssueHeaders = false;
+    process.stdout.write('\nGetting repo issues...');
+    const repoIssues = await GitHub.getRepoIssues();
+    console.log(`Number of issues loaded ${repoIssues.length}`);
     process.stdout.write('\nGetting cards...');
     // const column = columns[3];
     for (const column of columns) {
       // eslint-disable-next-line no-await-in-loop
-      let cards = await GitHub.getColumnCards(column.id);
+      const columnCards = await GitHub.getColumnCards(column.id);
       // Too many concurrent results will trigger API secondary rate limit
-      if (cards.length > maxResults) {
-        cards = cards.slice(0, maxResults);
-      }
-      column.numCards = cards.length;
-      if (Array.isArray(cards)) {
-      // eslint-disable-next-line no-loop-func
-        const issues = cards.map(async (card) => {
-        // For an Issue card, `card.note` is null.
+      // if (cards.length > maxResults) {
+      //   cards = cards.slice(0, maxResults);
+      // }
+      column.numCards = columnCards.length;
+      if (Array.isArray(columnCards)) {
+        const sortedCards = columnCards.map((card) => {
           if (card.content_url?.includes('issues')) {
-          // Get issue number from content_url
+            // Get issue number from content_url
             const issueId = card.content_url.match(/\d+/g);
-            // eslint-disable-next-line no-await-in-loop
-            try {
-              const issue = await GitHub.getIssue(+issueId);
-              return issue.data ? issue.data : issue;
-            } catch (err) {
-              console.log(`Get issue error with issue ID: ${issueId}`);
-              console.log(err);
-            }
+            const issueIndex = repoIssues.index((issue) => issue.id === issueId);
+            return repoIssues[issueIndex];
           }
           return card;
         });
+
+        // if (Array.isArray(columnCards)) {
+        //   // eslint-disable-next-line no-loop-func
+        //   const issues = columnCards.map(async (card) => {
+        // For an Issue card, `card.note` is null.
+        // if (card.content_url?.includes('issues')) {
+        //   // Get issue number from content_url
+        //   const issueId = card.content_url.match(/\d+/g);
+        //   // eslint-disable-next-line no-await-in-loop
+        //   try {
+        //     const issue = await GitHub.getIssue(+issueId);
+        //     return issue.data ? issue.data : issue;
+        //   } catch (err) {
+        //     console.log(`Get issue error with issue ID: ${issueId}`);
+        //     console.log(err);
+        //   }
+        // }
+        // return card;
+        // });
+
         console.log(`\nColumn ${column.name} issues loaded `);
-        for (const issue of issues) {
-        // eslint-disable-next-line no-await-in-loop
-          const issueValue = await issue;
+        for (const issue of sortedCards) {
+          // eslint-disable-next-line no-await-in-loop
+          // const issueValue = await issue;
 
           // For a regular note card, `card.note` is the card contents.
           // For an Issue card, `card.note` is null.
-          const title = issueValue.note ? issueValue.note : issueValue.title;
+          const title = issue.note ? issue.note : issue.title;
 
           // If card is an issue, populate issue fields.
           let issueFields = {};
-          if (!issueValue.note) {
+          if (!issue.note) {
             issueFields = {
-            // State: issueValue.state,
-              Labels: issueValue.labels.length > 0
-                ? issueValue.labels.reduce((labelString, label) => (labelString === null
-                  ? label.name
-                  : `${labelString}, ${label.name}`), null)
-                : undefined,
+              // State: issue.state,
+              Labels:
+                issue.labels.length > 0
+                  ? issue.labels.reduce(
+                    (labelString, label) => (labelString === null
+                      ? label.name
+                      : `${labelString}, ${label.name}`),
+                    null,
+                  )
+                  : undefined,
               // eslint-disable-next-line max-len
-              // issue_link: issueValue.html_url, // This is either the PR request (if exists) or issue
-              // issue_body: issueValue.body,
-              Assignees: issueValue.assignees.length > 0
-                ? issueValue.assignees.reduce((assigneeString, assignee) => (assigneeString === null
-                  ? assignee.login
-                  : `${assigneeString}, ${assignee.login}`), null)
-                : undefined,
-              Initiative: issueValue.labels.length
-                ? issueValue.labels.reduce((labelString, label) => {
+              // issue_link: issue.html_url, // This is either the PR request (if exists) or issue
+              // issue_body: issue.body,
+              Assignees:
+                issue.assignees.length > 0
+                  ? issue.assignees.reduce(
+                    (assigneeString, assignee) => (assigneeString === null
+                      ? assignee.login
+                      : `${assigneeString}, ${assignee.login}`),
+                    null,
+                  )
+                  : undefined,
+              Initiative: issue.labels.length
+                ? issue.labels.reduce((labelString, label) => {
                   if (labelString === null) {
                     if (label.name.includes('initiative:')) {
                       return label.name;
@@ -180,20 +207,22 @@ import GitHubQuery from './github.mjs';
                 }, null)
                 : undefined,
               /*
-            issue_created_at: issueValue.created_at,
-            issue_updated_at: issueValue.updated_at,
-            issue_closed_at: issueValue.closed_at,
+            issue_created_at: issue.created_at,
+            issue_updated_at: issue.updated_at,
+            issue_closed_at: issue.closed_at,
             */
-              Milestone: issueValue.milestone ? issueValue.milestone.title : null,
+              Milestone: issue.milestone
+                ? issue.milestone.title
+                : null,
             };
           }
 
           const cardFields = {
             Title: title,
             Column: column.name,
-          // creator: card.creator.login,
-          // created_at: card.created_at,
-          // updated_at: card.updated_at,
+            // creator: card.creator.login,
+            // created_at: card.created_at,
+            // updated_at: card.updated_at,
           };
 
           if (!addedCardHeaders) {
@@ -246,7 +275,7 @@ import GitHubQuery from './github.mjs';
 
     fs.outputFile(outputFilename, outputCSV, { encoding: 'utf8' }, (err) => {
       if (err) {
-        throw (err);
+        throw err;
       }
       console.group(`Printed output to ${outputFilename}`);
       columns.forEach((column) => console.log(`${column.name}: ${column.numCards}`));
