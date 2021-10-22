@@ -101,7 +101,7 @@ import GitHubQuery from './github.mjs';
       type: 'integer',
     });
 
-    process.stdout.write('Getting project columns...');
+    process.stdout.write('\nGetting project columns...');
 
     const projectId = projects[projectIndex].id;
     const columns = await GitHub.getProjectColumns(projectId);
@@ -145,7 +145,7 @@ import GitHubQuery from './github.mjs';
           return card;
         });
 
-        console.log(`\nColumn ${column.name} issues loaded `);
+        process.stdout.write(`\nColumn ${column.name} issues loaded `);
         for (const issuePromise of sortedCards) {
           // eslint-disable-next-line no-await-in-loop
           const issue = await issuePromise;
@@ -230,9 +230,12 @@ import GitHubQuery from './github.mjs';
     process.stdout.clearLine();
     process.stdout.cursorTo(0);
 
+    const dateStr = new Date().toISOString().split('T')[0];
+    const defaultFileName = `output/${owner.toUpperCase()}-${repo}-${dateStr}.csv`;
+
     const { outputFilename } = await prompt.get({
       name: 'outputFilename',
-      default: 'output/export.csv',
+      default: defaultFileName,
       description: 'What file name to export to?',
       type: 'string',
       required: true,
