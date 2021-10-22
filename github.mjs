@@ -71,9 +71,10 @@ export default class GitHubQuery {
    */
   async getRepoIssues() {
     const { owner, repo } = this;
-    return this.octokit.rest.paginate(this.octokit.rest.issues.get(), {
+    return this.octokit.paginate(this.octokit.rest.issues.listForRepo, {
       owner,
       repo,
+      state: 'all',
     });
   }
 }
