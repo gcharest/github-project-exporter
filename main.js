@@ -15,7 +15,7 @@ import GitHubQuery from './github.mjs';
 
     prompt.start();
     const {
-      owner, repo, token, perPage,
+      owner, repo, token, perPage, maxResults,
     } = await prompt.get([
       {
         name: 'owner',
@@ -117,53 +117,38 @@ import GitHubQuery from './github.mjs';
     let csvHeaders = [];
     let addedCardHeaders = false;
     let addedIssueHeaders = false;
-    process.stdout.write('\nGetting repo issues...');
-    const repoIssues = await GitHub.getRepoIssues();
-    console.log(`Number of issues loaded ${repoIssues.length}`);
+
+    // Fetch columns cards
     process.stdout.write('\nGetting cards...');
     // const column = columns[3];
     for (const column of columns) {
       // eslint-disable-next-line no-await-in-loop
-      const columnCards = await GitHub.getColumnCards(column.id);
+      let columnCards = await GitHub.getColumnCards(column.id);
       // Too many concurrent results will trigger API secondary rate limit
-      // if (cards.length > maxResults) {
-      //   cards = cards.slice(0, maxResults);
-      // }
+      if (columnCards.length > maxResults) {
+        columnCards = columnCards.slice(0, maxResults);
+      }
       column.numCards = columnCards.length;
       if (Array.isArray(columnCards)) {
-        const sortedCards = columnCards.map((card) => {
+        const sortedCards = columnCards.map(async (card) => {
           if (card.content_url?.includes('issues')) {
             // Get issue number from content_url
             const issueId = card.content_url.match(/\d+/g);
-            const issueIndex = repoIssues.index((issue) => issue.id === issueId);
-            return repoIssues[issueIndex];
+            try {
+              const issue = await GitHub.getIssue(+issueId);
+              return issue.data ? issue.data : issue;
+            } catch (err) {
+              process.stdout.write(`\nError with issue ID: ${issueId}`);
+              process.stdout.write(err);
+            }
           }
           return card;
         });
 
-        // if (Array.isArray(columnCards)) {
-        //   // eslint-disable-next-line no-loop-func
-        //   const issues = columnCards.map(async (card) => {
-        // For an Issue card, `card.note` is null.
-        // if (card.content_url?.includes('issues')) {
-        //   // Get issue number from content_url
-        //   const issueId = card.content_url.match(/\d+/g);
-        //   // eslint-disable-next-line no-await-in-loop
-        //   try {
-        //     const issue = await GitHub.getIssue(+issueId);
-        //     return issue.data ? issue.data : issue;
-        //   } catch (err) {
-        //     console.log(`Get issue error with issue ID: ${issueId}`);
-        //     console.log(err);
-        //   }
-        // }
-        // return card;
-        // });
-
         console.log(`\nColumn ${column.name} issues loaded `);
-        for (const issue of sortedCards) {
+        for (const issuePromise of sortedCards) {
           // eslint-disable-next-line no-await-in-loop
-          // const issueValue = await issue;
+          const issue = await issuePromise;
 
           // For a regular note card, `card.note` is the card contents.
           // For an Issue card, `card.note` is null.
