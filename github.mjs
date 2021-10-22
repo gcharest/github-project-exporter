@@ -1,9 +1,5 @@
 import { Octokit } from 'octokit';
 
-import axios from 'axios';
-
-const API_URL = 'https://api.github.com';
-
 export default class GitHubQuery {
   constructor({
     owner, repo, token, isOwnerUser, perPage,
@@ -13,17 +9,6 @@ export default class GitHubQuery {
     this.repo = repo;
     this.isOwnerUser = isOwnerUser;
     this.perPage = perPage;
-  }
-
-  async get(url, { prependAPIURL = true } = {}) {
-    return (
-      await axios.get(prependAPIURL ? `${API_URL}/${url}` : url, {
-        headers: {
-          Accept: 'application/vnd.github.inertia-preview+json',
-          Authorization: `token ${this.token}`,
-        },
-      })
-    ).data;
   }
 
   async getData() {
@@ -78,6 +63,12 @@ export default class GitHubQuery {
     });
   }
 
+  /**
+   * Async function getting all issues from a GitHub repository.
+   * @param {string} owner  A GitHub owner or organisation.
+   * @param {string} repo   A repository.
+   * @returns All the repository issues if succesful.
+   */
   async getRepoIssues() {
     const { owner, repo } = this;
     return this.octokit.rest.paginate(this.octokit.rest.issues.get(), {
